@@ -1,7 +1,6 @@
 import logging
 import traceback
 import uvicorn
-import aioredis
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -100,29 +99,18 @@ ReedScheduler.add_middleware(
     allow_headers=["*"],
 )
 
-redis_config = {
-    "host": "service.persona.net.cn",
-    "port": 6379,
-    "password": "Shashiyuefu@2021",
-    "db": 14
-}
-
 
 
 def redis_management(ReedCalendar: FastAPI):
     @ReedCalendar.on_event("startup")
     async def init_redis():
-        pool = aioredis.ConnectionPool(host=redis_config["host"], port=redis_config["port"],
-                                       password=redis_config["password"], db=redis_config["db"], decode_responses=True)
-        redis_conn = await aioredis.Redis(connection_pool=pool)
-        ReedCalendar.state.redis = redis_conn
         # start scheduler
         scheduler.start()
 
 
     @ReedCalendar.on_event("shutdown")
     async def close_redis():
-        await ReedCalendar.state.redis.close()
+        ...
 
 
 redis_management(ReedScheduler)

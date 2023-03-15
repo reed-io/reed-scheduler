@@ -5,9 +5,9 @@ from apscheduler.executors.pool import ThreadPoolExecutor
 
 
 redis_config = {
-    "host": "service.persona.net.cn",
+    "host": "redis host",
     "port": 6379,
-    "password": "Shashiyuefu@2021",
+    "password": "redis password",
     "db": 14
 }
 
