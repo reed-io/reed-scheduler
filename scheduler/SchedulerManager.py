@@ -2,12 +2,12 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 from apscheduler.executors.pool import ThreadPoolExecutor
 
-
+from utils.EnderUtil import SysUtil
 
 redis_config = {
-    "host": "redis host",
+    "host": SysUtil.get_os_env("REDIS_HOST"),
     "port": 6379,
-    "password": "redis password",
+    "password": SysUtil.get_os_env("REDIS_PASSWORD"),
     "db": 14
 }
 
@@ -19,7 +19,8 @@ scheduler_config = {
         'default': ThreadPoolExecutor(10)
     },
     "job_defaults": {
-        'coalesce': False,
+        'coalesce': False,  # 不许合并执行
+        'max_instances': 1  # 默认最大示例数一律为1
     }
 }
 

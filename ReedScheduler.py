@@ -1,6 +1,7 @@
 import logging
 import traceback
 import uvicorn
+import aioredis
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -9,6 +10,7 @@ from starlette.exceptions import HTTPException
 
 from define.ReedResult import ReedResult
 from define.BaseErrorCode import BaseErrorCode as ErrorCode
+from handler.ReedJobHandler import handler
 
 from scheduler.SchedulerManager import scheduler
 
@@ -18,11 +20,16 @@ from controller.datetime_controller import datetime as datetime_router
 from controller.cron_controller import cron as cron_router
 from controller.console_controller import console as console_router
 
+from utils.EnderUtil import SysUtil
+
 from fastapi.middleware.cors import CORSMiddleware
+
+from apscheduler.events import JobEvent, EVENT_JOB_ADDED, EVENT_JOB_MISSED, EVENT_JOB_REMOVED, EVENT_JOB_EXECUTED
+from event.ReedJobEvent import ReedJobExecuteEvent
 
 ReedScheduler = FastAPI(title="ReedScheduler")
 ReedScheduler.include_router(console_router, prefix="/console")
-# ReedScheduler.include_router(test_router, prefix="/test")
+ReedScheduler.include_router(test_router, prefix="/test")
 ReedScheduler.include_router(interval_router, prefix="/interval")
 ReedScheduler.include_router(datetime_router, prefix="/datetime")
 ReedScheduler.include_router(cron_router, prefix="/cron")
@@ -101,24 +108,40 @@ ReedScheduler.add_middleware(
 
 
 
-def redis_management(ReedCalendar: FastAPI):
-    @ReedCalendar.on_event("startup")
-    async def init_redis():
+def reed_management(ReedScheduler: FastAPI):
+    @ReedScheduler.on_event("startup")
+    async def on_startup():
+        redis_config = {
+            "host": SysUtil.get_os_env("REDIS_HOST"),
+            "port": 6379,
+            "password": SysUtil.get_os_env("REDIS_PASSWORD"),
+            "db": 14
+        }
+        pool = aioredis.ConnectionPool(host=redis_config["host"], port=redis_config["port"],
+                                       password=redis_config["password"], db=redis_config["db"], decode_responses=True)
+        redis_conn = await aioredis.Redis(connection_pool=pool)
+        ReedScheduler.state.redis = redis_conn
         # start scheduler
+        scheduler.add_listener(handler.job_added, EVENT_JOB_ADDED)
+        scheduler.add_listener(handler.job_missed, EVENT_JOB_MISSED)
+        scheduler.add_listener(handler.job_remove, EVENT_JOB_REMOVED)
+        scheduler.add_listener(handler.job_execute, EVENT_JOB_EXECUTED)
+        scheduler.add_listener(handler.job_execute_detail, ReedJobExecuteEvent.EVENT_JOB_EXECUTE_DETAIL)
         scheduler.start()
 
 
-    @ReedCalendar.on_event("shutdown")
-    async def close_redis():
-        ...
+
+    @ReedScheduler.on_event("shutdown")
+    async def on_shutdown():
+        await ReedScheduler.state.redis.close()
 
 
-redis_management(ReedScheduler)
+reed_management(ReedScheduler)
 
 
 @ReedScheduler.get("/")
 async def index():
-    return ReedResult.get(ErrorCode.SUCCESS, "ReedCalendar Service is running")
+    return ReedResult.get(ErrorCode.SUCCESS, "ReedScheduler Service is running")
 
 
 @ReedScheduler.exception_handler(HTTPException)

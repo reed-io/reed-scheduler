@@ -1,6 +1,7 @@
 import json
 import re
 import time
+import os
 from datetime import datetime
 import uuid
 
@@ -154,6 +155,12 @@ class TimeUtil(object):
         if not TimeUtil.is_leap_year(dt.year) and dt.month > 2:
             idx -= 1
         return idx
+
+
+class SysUtil:
+    @staticmethod
+    def get_os_env(key: str) -> str:
+        return os.getenv(key)
 
     # print(TimeUtil.now())
     # print(TimeUtil.unix_now())

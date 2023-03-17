@@ -1,5 +1,5 @@
 import logging
-
+import pytz
 from apscheduler.triggers.date import DateTrigger
 from fastapi import APIRouter, Form, Request
 
@@ -15,6 +15,7 @@ from define.ReedResult import ReedResult
 datetime = APIRouter()
 
 BUSI_PARAMS = ["datetime", "callback_url", "fingerprint", "job_name"]
+DEFAULT_TIMEZONE = 'Asia/Shanghai'
 
 @datetime.post("/{app_id}/job", tags=["创建datetime类型的job"])
 async def create_job(app_id: str, request: Request, datetime: str = Form(None), callback_url: str = Form(None),
@@ -58,7 +59,7 @@ async def create_job(app_id: str, request: Request, datetime: str = Form(None), 
     _uuid = StringUtil.uuid()
     # _id = app_id+"-"+_uuid
     _id = ReedSchedulerUtil.gen_job_id(app_id, _uuid)
-    datetime_trigger = DateTrigger(run_date=datetime)
+    datetime_trigger = DateTrigger(run_date=datetime, timezone=pytz.timezone(DEFAULT_TIMEZONE))
     scheduler.add_job(ReedSchedulerUtil.post, trigger=datetime_trigger, args=[app_id, _uuid, job_name, callback_url, headers.__str__()],
                       id=_id, name=job_name, kwargs=params, replace_existing=True, max_instances=1, misfire_grace_time=1)
     result = ReedResult.get(ReedSchedulerErrorCode.SUCCESS, _uuid)

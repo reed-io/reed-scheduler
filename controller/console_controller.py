@@ -10,6 +10,8 @@ from define.ReedDatetimeJob import ReedDatetimeJob
 from define.ReedIntervalJob import ReedIntervalJob
 from scheduler.SchedulerManager import scheduler
 
+from define.ReedJobAction import ReedJobAction
+
 from define.ReedSchedulerErrorCode import ReedSchedulerErrorCode
 from define.ReedResult import ReedResult
 
@@ -137,23 +139,28 @@ async def delete_job_by_job_id_within_app_id(app_id: str, job_id: str):
     return result
 
 
-# @console.get("/{app_id}/job/times/{job_id}")
-# async def get_run_times_by_job_id_within_app_id(app_id: str, job_id: str):
-#     if StringUtil.isEmpty(app_id):
-#         logging.warning(f"parameter error: app_id is empty!")
-#         result = ReedResult.get(ReedSchedulerErrorCode.APPID_EMPTY, app_id)
-#         return result
-#     if not ReedSchedulerUtil.is_validate_app_id(app_id):
-#         logging.warning(f"parameter error: app_id is invalidate!")
-#         result = ReedResult.get(ReedSchedulerErrorCode.APPID_INVALIDATE, app_id)
-#         return result
-#     if StringUtil.isEmpty(job_id):
-#         logging.warning(f"parameter error: job_id is empty!")
-#         result = ReedResult.get(ReedSchedulerErrorCode.JOBID_EMPTY, job_id)
-#         return result
-#     _job_id = ReedSchedulerUtil.gen_job_id(app_id, job_id)
-#     job = scheduler.get_job(_job_id)
-#     if not job:
-#         logging.warning(f"can not find a job with job_id: {_job_id}")
-#         result = ReedResult.get(ReedSchedulerErrorCode.JOB_NOT_FOUND, job_id)
-#         return result
+@console.get("/{app_id}/job/{job_id}/history", tags=["获取指定任务的历史记录"])
+async def get_job_history_by_job_id_within_app_id(app_id: str, job_id: str, request: Request):
+    if StringUtil.isEmpty(app_id):
+        logging.warning(f"parameter error: app_id is empty!")
+        result = ReedResult.get(ReedSchedulerErrorCode.APPID_EMPTY, app_id)
+        return result
+    if not ReedSchedulerUtil.is_validate_app_id(app_id):
+        logging.warning(f"parameter error: app_id is invalidate!")
+        result = ReedResult.get(ReedSchedulerErrorCode.APPID_INVALIDATE, app_id)
+        return result
+    if StringUtil.isEmpty(job_id):
+        logging.warning(f"parameter error: job_id is empty!")
+        result = ReedResult.get(ReedSchedulerErrorCode.JOBID_EMPTY, job_id)
+        return result
+    redis_conn = request.app.state.redis
+    job_history_key = ReedSchedulerUtil.gen_job_history_key(app_id, job_id)
+    history_list_length = await redis_conn.llen(job_history_key)
+    history = await redis_conn.lrange(job_history_key, 0, history_list_length)
+    reed_job_action_list = list()
+    for action in history:
+        reed_job_action = ReedJobAction.parse_raw(action)
+        reed_job_action_list.append(reed_job_action)
+    result = ReedResult.get(ReedSchedulerErrorCode.SUCCESS, reed_job_action_list)
+    return result
+
